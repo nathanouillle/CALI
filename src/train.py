@@ -34,10 +34,11 @@ def train_resnet(
         momentum=0.9,
         nesterov=True,
     )
-    scheduler = CosineAnnealingLR(optimizer, T_max=5)
+    scheduler = CosineAnnealingLR(optimizer, T_max=4)
 
     model.train()
-    for epoch in range(5):
+    epochs = 3
+    for epoch in range(epochs):
         total_loss = 0.0
         for X, y in train_loader:
             X, y = X.to(DEVICE), y.to(DEVICE)
@@ -51,7 +52,7 @@ def train_resnet(
         scheduler.step()
         avg_loss = total_loss / len(train_loader)
         current_lr = scheduler.get_last_lr()[0]
-        print(f"Seed {seed} | Epoch {epoch + 1}/5 | Loss: {avg_loss:.4f} | LR: {current_lr:.2e}")
+        print(f"Seed {seed} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.4f} | LR: {current_lr:.2e}")
 
     torch.save(model.state_dict(), ckpt_path)
     print(f"Checkpoint saved at {ckpt_path}")

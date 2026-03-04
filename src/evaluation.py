@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from numpy.typing import ArrayLike
 from scipy.special import logsumexp
 from sklearn.decomposition import PCA
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
 from tqdm import tqdm
 
 from .constants import ARCHI_LAYERS, DEVICE, MODELS_DIR, RESULTS_DIR
@@ -33,7 +33,7 @@ def to_numpy(x: Union[torch.Tensor, np.ndarray, ArrayLike]) -> np.ndarray:
     return x_arr.flatten()
 
 
-def load_wae_scores(seed: int) -> Optional[np.ndarray]:
+def load_cali_scores(seed: int) -> Optional[np.ndarray]:
     """Load WAE-KDE scores from the penultimate layer."""
     arch_config = ARCHI_LAYERS.get("resnet")
     layer = arch_config[-2] if arch_config else None
@@ -170,9 +170,9 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
     labels_eval_1d = to_numpy(eval_features["labels"])
     preds_eval_1d = to_numpy(eval_features["predictions"])
 
-    wae_scores = load_wae_scores(seed)
+    cali_scores = load_cali_scores(seed)
     softmax_scores, energy_scores = get_baseline_scores(eval_features)
-    mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(seed=seed, nb_inference=50,)
+    mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(seed=seed, nb_inference=50)
 
     layers = ARCHI_LAYERS.get("resnet")
     if layers is None or len(layers) < 2:
@@ -193,7 +193,7 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
     data = {
         "gold_label": labels_eval_1d,
         "predicted_label": preds_eval_1d,
-        "score_wae": wae_scores,
+        "score_cali": cali_scores,
         "score_softmax": softmax_scores,
         "score_energy": energy_scores,
         "score_mcdropout": mc_dropout_scores,
@@ -207,12 +207,11 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
         if value is not None
     })
 
-
 def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     """Compute the metrics table for all evaluated confidence methods."""
     correctness = (results["gold_label"] == results["predicted_label"]).astype(int)
 
-    metrics_ae = compute_metrics(scores=results["score_wae"], labels=correctness)
+    metrics_cali = compute_metrics(scores=results["score_cali"], labels=correctness)
     metrics_softmax = compute_metrics(scores=results["score_softmax"], labels=correctness)
     metrics_trust = compute_metrics(scores=results["score_trust"], labels=correctness)
     metrics_energy = compute_metrics(scores=results["score_energy"], labels=correctness)
@@ -226,7 +225,6 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
         "FPR@95TPR (lower)",
         "AUPR",
         "AUPR-error",
-        "Polarisation",
         "Wasserstein",
         "AURC (lower)",
         "e-AURC (lower)",
@@ -234,7 +232,7 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(
         {
-            "WAE_AE": metrics_ae,
+            "WAE_Cali": metrics_cali,
             "Softmax": metrics_softmax,
             "TrustScore": metrics_trust,
             "EnergyScore": metrics_energy,
@@ -242,3 +240,154 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
         },
         index=row_titles,
     )
+
+def compare_methods(seed: int=0) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the full evaluation pipeline and print the metrics comparison."""
+    results = evaluate_all_methods(seed=seed)
+    metrics_table = compute_all_metrics(results)
+
+    print("\n--- Confidence Metrics Comparison ---")
+    print(metrics_table.round(4))
+    return metrics_table, results
+
+def analyze_failure_threshold(
+    df: pd.DataFrame,
+    score_col: str,
+    n_points: int = 50,
+    delta_ratio: float = 0.05,
+) -> dict[str, Any]:
+    """Analyze local robustness of a score threshold around its ROC-optimal value.
+
+    The function computes an optimal acceptance threshold (`tau_star`) from the
+    ROC curve (Youden criterion), then evaluates how the accepted-sample error
+    risk changes in a local neighborhood around `tau_star`.
+
+    Args:
+        df: Evaluation DataFrame containing labels, predictions and score columns.
+        score_col: Name of the confidence-score column to analyze.
+        n_points: Number of thresholds sampled in the local neighborhood.
+        delta_ratio: Neighborhood half-width as a ratio of score range.
+
+    Returns:
+        Dictionary with:
+            - `tau_star`: best threshold maximizing TPR - FPR.
+            - `risk_star`: empirical risk at `tau_star`.
+            - `test_thresholds`: sampled thresholds around `tau_star`.
+            - `risk_increase`: relative degradation of risk vs `risk_star`.
+            - `ari`: average risk increase over the local neighborhood.
+
+    Raises:
+        KeyError: If `score_col` does not exist in `df`.
+        ValueError: If `n_points < 2` or `delta_ratio < 0`.
+    """
+    if score_col not in df.columns:
+        raise KeyError(f"Column '{score_col}' not found in DataFrame.")
+    if n_points < 2:
+        raise ValueError("n_points must be >= 2.")
+    if delta_ratio < 0:
+        raise ValueError("delta_ratio must be >= 0.")
+
+    if score_col == "deep_ensemble_scores" and "deep_correctness" in df.columns:
+        y_error = 1 - df["deep_correctness"].to_numpy()
+    elif score_col == "score_mcdropout" and "mc_dropout_correctness" in df.columns:
+        y_error = 1 - df["mc_dropout_correctness"].to_numpy()
+    else:
+        y_error = (df["gold_label"] != df["predicted_label"]).astype(int).to_numpy()
+
+    scores = df[score_col].to_numpy()
+
+    fpr, tpr, thresholds = roc_curve(y_error, -scores)
+    j_scores = tpr - fpr
+    best_idx = int(np.argmax(j_scores))
+    tau_star = float(-thresholds[best_idx])
+
+    def compute_risk(threshold: float) -> float:
+        accepted = scores >= threshold
+        if accepted.sum() == 0:
+            return 0.0
+        return float(np.mean(y_error[accepted]))
+
+    risk_star = compute_risk(tau_star)
+
+    score_range = float(scores.max() - scores.min())
+    delta = float(delta_ratio * score_range)
+    test_thresholds = np.linspace(tau_star - delta, tau_star + delta, n_points)
+
+    risks = np.array([compute_risk(float(threshold)) for threshold in test_thresholds])
+
+    epsilon = 1e-6
+    risk_increase = np.abs(risks - risk_star) / (risk_star + epsilon)
+    ari = float(np.trapezoid(risk_increase, test_thresholds))
+
+    width = float(test_thresholds[-1] - test_thresholds[0])
+    if width > 0:
+        ari /= width
+
+    return {
+        "tau_star": tau_star,
+        "risk_star": risk_star,
+        "test_thresholds": test_thresholds,
+        "risk_increase": risk_increase,
+        "ari": ari,
+    }
+
+
+def save_failure_threshold(
+    seed: int,
+    deltas: Optional[Sequence[float]] = None,
+    output_dir: str = "./results/failure_threshold",
+) -> pd.DataFrame:
+    """Compute and save local threshold-robustness metrics for one seed.
+
+    The function runs a single evaluation pass, computes failure-threshold
+    robustness metrics (including ARI) for every detected score column and every
+    delta value, then saves the consolidated table as CSV.
+
+    Args:
+        seed: Random seed used to load model/features and run evaluation.
+        deltas: Sequence of neighborhood ratios passed to
+            `analyze_failure_threshold`. Defaults to
+            `[0.01, 0.02, 0.05, 0.1, 0.15, 0.2]`.
+        output_dir: Directory where the CSV file is written.
+
+    Returns:
+        The consolidated DataFrame that is also saved to disk.
+    """
+    deltas = deltas or (0.01, 0.02, 0.05, 0.1, 0.15, 0.2)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    df = evaluate_all_methods(seed=seed)
+    score_cols = [col for col in df.columns if "score_" in col or "_scores" in col]
+
+    seed_results: list[dict[str, Any]] = []
+    for delta in deltas:
+        for score_col in score_cols:
+            analysis = analyze_failure_threshold(
+                df=df,
+                score_col=score_col,
+                delta_ratio=float(delta),
+                n_points=50,
+            )
+
+            seed_results.append(
+                {
+                    "Seed": seed,
+                    "Dataset": "cifar10",
+                    "Architecture": "resnet18",
+                    "Method": score_col,
+                    "Delta": float(delta),
+                    "ARI": analysis["ari"],
+                    "Tau Star": analysis["tau_star"],
+                    "Risk Star": analysis["risk_star"],
+                    "Risk Increase": analysis["risk_increase"],
+                    "Test Thresholds": analysis["test_thresholds"],
+                }
+            )
+
+    seed_df = pd.DataFrame(seed_results)
+    file_path = os.path.join(output_dir, f"cifar10_resnet_seed{seed}_results.csv")
+    seed_df.to_csv(file_path, index=False)
+    print(f"Results for seed {seed} saved to {file_path}")
+
+    return seed_df

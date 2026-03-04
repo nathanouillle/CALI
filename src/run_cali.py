@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .evaluation import compute_metrics
 from .cwae import MultiClassCWAEManager
+from .kde_trust import KDETrust
 from .constants import CWAE_CONFIG, RESULTS_DIR, ARCHI_LAYERS
 
 @dataclass
@@ -171,7 +172,6 @@ def score_kde(
     bandwidth: Union[str, List[float]],
     distance_metric: str,
 ) -> Tuple[Any, ...]:
-    from kde_trust import KDETrust
     start_time = time.time()
     save_dir = os.path.join(RESULTS_DIR, f"cwae_cifar10_resnet", f"seed{seed}", layer)
     kde_scorer = KDETrust(

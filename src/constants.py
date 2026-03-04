@@ -21,7 +21,6 @@ CWAE_CONFIG = {
     "batch_size": 128,
     "lr": 1e-3,
     "visualise": False,
-    "lambda_recon": 1.0,
     "lambda_cw": 10,
     "gamma_metric": 0.1,
     "margin_factor": 2.5,

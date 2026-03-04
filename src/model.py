@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torchvision.models as tv_models
 
 class ResNet(nn.Module):
-    def __init__(self, num_classes: int = 10, input_channels: int = 3, dropout_rate: float = 0.2) -> None:
+    def __init__(self, num_classes: int = 10, input_channels: int = 3, dropout_rate: float = 0.3) -> None:
         """
         Build a ResNet-18 backbone adapted for small images.
 
