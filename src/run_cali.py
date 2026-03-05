@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from .evaluation import compute_metrics
 from .cwae import MultiClassCWAEManager
 from .kde_trust import KDETrust
+from .extractor import run_full_extraction_pipeline
 from .constants import CWAE_CONFIG, RESULTS_DIR, ARCHI_LAYERS
 
 @dataclass
@@ -46,7 +47,9 @@ def load_raw_data_dicts(seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     train_path = os.path.join(folder, "train_features.pt")
     
     if not (os.path.exists(train_path) and os.path.exists(eval_path)):
-        raise FileNotFoundError(f"Feature files not found in: {folder}")
+        print("Extracting DNN features for the first time...")
+        run_full_extraction_pipeline(seed=seed)
+
 
     eval_dict = torch.load(eval_path)
     train_dict = torch.load(train_path)

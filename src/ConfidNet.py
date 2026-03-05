@@ -8,9 +8,10 @@ from typing import Tuple
 from torch.utils.data import TensorDataset, DataLoader
 
 from .utils import set_seed
+from .extractor import run_full_extraction_pipeline
 from .constants import ARCHI_LAYERS, DEVICE, MODELS_DIR, RESULTS_DIR
 
-# CODE BASED ON THE OFFICIAL CONFIDNET IMPLEMENTATION AVAILABLE AT: https://github.com/valeoai/ConfidNet/tree/master?tab=readme-ov-file
+# CODE AND TRAINING BASED HYPERPARAMETERS FOR CIFAR10 BASED ON THE OFFICIAL CONFIDNET IMPLEMENTATION AVAILABLE AT: https://github.com/valeoai/ConfidNet/tree/master?tab=readme-ov-file
 # Under the Apache License, Version 2.0, Copyright 2019 Valeo
 
 def get_confid_net_model(input_dim: int) -> nn.Module:
@@ -39,13 +40,9 @@ def get_confid_net_model(input_dim: int) -> nn.Module:
 
 
 def get_confidnet_loader(feature_path: str, layer_key: str, train: bool) -> Tuple[DataLoader, int]:
-    if train:
-        shuffle = True
-        train_path = os.path.join(feature_path, "train_features.pt")
-        data = torch.load(train_path)
-    else:
-        shuffle = False
-        data = torch.load(feature_path)
+    if not os.path.exists(feature_path):
+        run_full_extraction_pipeline(seed=int(feature_path.split("seed")[-1].split("/")[0]))
+    data = torch.load(feature_path)
 
     if layer_key not in data:
         raise KeyError(f"Layer '{layer_key}' not found in file. Available keys: {list(data.keys())}")
@@ -65,22 +62,26 @@ def get_confidnet_loader(feature_path: str, layer_key: str, train: bool) -> Tupl
     assert tcp.shape == (features.shape[0], 1), f"Invalid TCP shape: {tcp.shape}"
 
     dataset = TensorDataset(features, tcp)
-    return DataLoader(dataset, batch_size=64, shuffle=shuffle), features.shape[1]
+    return DataLoader(dataset, batch_size=128, shuffle=train), features.shape[1]
 
 
-def train_confidnet(seed: int,epochs: int=170,lr: float=0.1,momentum: float=0.9,weight_decay: float=0.0001) -> float:
+def train_confidnet(seed: int, epochs: int=250, lr: float=0.01, momentum: float=0.9, weight_decay: float=0.0005) -> None:
     """
     Train ConfidNet on extracted features using TCP as regression target.
     """
     save_path = f"{MODELS_DIR}/confidnet_cifar10_resnet_seed{seed}.pt"
 
     if os.path.exists(save_path):
-        print(f"ConfidNet already trained (found at {save_path}).")
-
+        print(f"[SKIP TRAINING] Model already exists at: {save_path}")
+        return
     set_seed(seed)
 
     layers = ARCHI_LAYERS.get('resnet')
-    tuning_loader_confid, input_dim = get_confidnet_loader(feature_path=f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}", layer_key=layers[-2], train=True)
+    tuning_loader_confid, input_dim = get_confidnet_loader(
+        feature_path=f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}/train_features.pt", 
+        layer_key=layers[-2], 
+        train=True
+    )
 
     confidnet = get_confid_net_model(input_dim)
     optimizer = torch.optim.SGD(
@@ -106,7 +107,6 @@ def train_confidnet(seed: int,epochs: int=170,lr: float=0.1,momentum: float=0.9,
 
     end_time = time.time()
     training_time = end_time - start_time
-    print("Training completed.")
     print(f"Total training time: {training_time:.2f} seconds")
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -154,4 +154,3 @@ def evaluate_confidnet(seed: int) -> None:
 
     save_path_confid = f"{RESULTS_DIR}/confidnet_cifar10_resnet_seed{seed}.npz"
     np.savez_compressed(save_path_confid, confidences=all_confidences)
-    print(f"ConfidNet scores saved to: {save_path_confid}")

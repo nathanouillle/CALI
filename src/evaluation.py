@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from .constants import ARCHI_LAYERS, DEVICE, MODELS_DIR, RESULTS_DIR
 from .model import create_model
+from .extractor import run_full_extraction_pipeline
 from .trustscore_baseline import TrustScore
 from .utils import (
     compute_aurc_eaurc,
@@ -54,7 +55,7 @@ def get_baseline_scores(eval_features: dict[str, torch.Tensor]) -> Tuple[np.ndar
     probs = F.softmax(logits, dim=1)
     softmax_scores = torch.max(probs, dim=1).values.numpy()
 
-    energy_scores = -logsumexp(logits.numpy(), axis=1)
+    energy_scores = -np.asarray(logsumexp(logits.numpy(), axis=1), dtype=np.float64)
     return normalise(softmax_scores), normalise(-energy_scores)
 
 
@@ -150,15 +151,74 @@ def get_mc_dropout(seed: int, nb_inference: int = 50) -> Tuple[np.ndarray, np.nd
 
     return confidence, correctness
 
+def compute_deep_ensemble(
+    ensemble_seeds: list[int],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute deep-ensemble entropy confidence and correctness.
 
-def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
+    The function loads eval logits for multiple seeds, averages class
+    probabilities, and returns entropy-based confidence (`-H`) along with
+    correctness labels of the ensemble predictions.
+    """
+    if len(ensemble_seeds) < 2:
+        raise ValueError("At least 2 seeds are required for deep ensemble computation.")
+
+    all_probs = []
+    labels_tensor = None
+
+    for seed in ensemble_seeds:
+        path = f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}/eval_features.pt"
+        if not os.path.exists(path):
+            run_full_extraction_pipeline(seed=seed)
+
+        data = torch.load(path)
+        logits_tensor = data["logits"].float().cpu()
+        probs_tensor = F.softmax(logits_tensor, dim=1)
+        all_probs.append(probs_tensor)
+
+        if labels_tensor is None:
+            labels_tensor = data["labels"].cpu()
+            if labels_tensor.dim() > 1:
+                if labels_tensor.shape[-1] == 1:
+                    labels_tensor = labels_tensor.squeeze(-1)
+                else:
+                    print(
+                        "Warning: labels have unexpected shape "
+                        f"{tuple(labels_tensor.shape)}. Using first column."
+                    )
+                    labels_tensor = labels_tensor[:, 0]
+
+    if not all_probs:
+        raise ValueError("No model outputs were loaded for deep ensemble.")
+    if labels_tensor is None:
+        raise ValueError("Unable to load labels for deep ensemble.")
+
+    stacked_probs = torch.stack(all_probs, dim=0)
+    mean_probs = torch.mean(stacked_probs, dim=0)
+
+    ensemble_preds = torch.argmax(mean_probs, dim=1).cpu().numpy()
+    labels = labels_tensor.cpu().numpy()
+    ensemble_correctness = (ensemble_preds == labels).astype(int)
+
+    epsilon = 1e-12
+    ensemble_entropy = -torch.sum(
+        mean_probs * torch.log(mean_probs + epsilon),
+        dim=1,
+    ).cpu().numpy()
+    deep_ensemble_scores = normalise(-ensemble_entropy)
+
+    return deep_ensemble_scores, ensemble_correctness
+
+
+def evaluate_all_methods(seed: int = 0, deep_ensemble_seeds: list[int]=[0,1,2,3,42]) -> pd.DataFrame:
     """Evaluate all confidence methods and return a unified results DataFrame."""
 
     feat_path = f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}"
     train_path = f"{feat_path}/train_features.pt"
     eval_path = f"{feat_path}/eval_features.pt"
-    if not os.path.exists(eval_path):
-        raise FileNotFoundError(f"Eval features not found: {eval_path}")
+    confidnet_path = f"{RESULTS_DIR}/confidnet_cifar10_resnet_seed{seed}.npz"
+    if not (os.path.exists(eval_path) or os.path.exists(train_path) or os.path.exists(confidnet_path)):
+        raise FileNotFoundError(f"Missing required files for seed {seed}. Ensure features and ConfidNet scores are computed.")
 
     tuning_features = torch.load(train_path)
     eval_features = torch.load(eval_path)
@@ -169,12 +229,15 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
 
     cali_scores = load_cali_scores(seed)
     softmax_scores, energy_scores = get_baseline_scores(eval_features)
+    confidnet_scores = normalise(np.load(confidnet_path)["confidences"])
     mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(seed=seed, nb_inference=50)
+    deep_ensemble_scores, deep_correctness = compute_deep_ensemble(ensemble_seeds=deep_ensemble_seeds)
 
     layers = ARCHI_LAYERS.get("resnet")
     if layers is None or len(layers) < 2:
         raise ValueError(f"Architecture 'resnet' is not valid in ARCHI_LAYERS.")
 
+    # Trust Score scoring from the penultimate layer and hyperparameters used in the original paper: https://github.com/google/TrustScore/tree/master
     trust_layer = layers[-2]
     X_tuning = tuning_features[trust_layer].numpy()
     X_eval = eval_features[trust_layer].numpy()
@@ -191,10 +254,13 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
         "gold_label": labels_eval_1d,
         "predicted_label": preds_eval_1d,
         "score_cali": cali_scores,
+        "score_confidnet": confidnet_scores,
         "score_softmax": softmax_scores,
         "score_energy": energy_scores,
         "score_mcdropout": mc_dropout_scores,
         "mc_dropout_correctness": correctness_mc_dropout,
+        "deep_ensemble_scores": deep_ensemble_scores,
+        "deep_correctness": deep_correctness,
         "score_trust": trust_scores,
     }
 
@@ -204,6 +270,7 @@ def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
         if value is not None
     })
 
+
 def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     """Compute the metrics table for all evaluated confidence methods."""
     correctness = (results["gold_label"] == results["predicted_label"]).astype(int)
@@ -212,9 +279,14 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     metrics_softmax = compute_metrics(scores=results["score_softmax"], labels=correctness)
     metrics_trust = compute_metrics(scores=results["score_trust"], labels=correctness)
     metrics_energy = compute_metrics(scores=results["score_energy"], labels=correctness)
+    metrics_confidnet = compute_metrics(scores=results["score_confidnet"], labels=correctness)
     metrics_mc_dropout = compute_metrics(
         scores=results["score_mcdropout"],
         labels=results["mc_dropout_correctness"],
+    )
+    metrics_deep_ensemble = compute_metrics(
+        scores=results["deep_ensemble_scores"],
+        labels=results["deep_correctness"],
     )
 
     row_titles = [
@@ -234,18 +306,24 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
             "TrustScore": metrics_trust,
             "EnergyScore": metrics_energy,
             "MC_Dropout": metrics_mc_dropout,
+            "Deep_Ensemble": metrics_deep_ensemble,
+            "ConfidNet": metrics_confidnet,
         },
         index=row_titles,
     )
 
-def compare_methods(seed: int=0) -> Tuple[pd.DataFrame, pd.DataFrame]:
+
+def compare_methods(seed: int=0, deep_ensemble_seeds: list[int]=[0,1,2,3,42]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Run the full evaluation pipeline and print the metrics comparison."""
-    results = evaluate_all_methods(seed=seed)
+    if len(deep_ensemble_seeds) < 2:
+        raise ValueError("At least 2 seeds are required for deep ensemble evaluation.")
+    results = evaluate_all_methods(seed=seed, deep_ensemble_seeds=deep_ensemble_seeds)
     metrics_table = compute_all_metrics(results)
 
     print("\n--- Confidence Metrics Comparison ---")
     print(metrics_table.round(4))
     return metrics_table, results
+
 
 def analyze_failure_threshold(
     df: pd.DataFrame,
@@ -329,8 +407,9 @@ def analyze_failure_threshold(
     }
 
 
-def save_failure_threshold(
+def get_failure_threshold(
     seed: int,
+    deep_ensemble_seeds: list[int],
     delta: float,
 ) -> pd.DataFrame:
     """Compute and save local threshold-robustness metrics for one seed.
@@ -341,13 +420,13 @@ def save_failure_threshold(
 
     Args:
         seed: Random seed used to load model/features and run evaluation.
+        deep_ensemble_seeds: List of seeds for deep ensemble methods.
         delta: Neighborhood ratio passed to `analyze_failure_threshold`.
-        output_dir: Directory where the CSV file is written.
 
     Returns:
         The threshold analysis DataFrame for the given seed and delta.
     """
-    df = evaluate_all_methods(seed=seed)
+    df = evaluate_all_methods(seed=seed, deep_ensemble_seeds=deep_ensemble_seeds)
     score_cols = [col for col in df.columns if "score_" in col or "_scores" in col]
 
     seed_results: list[dict[str, Any]] = []

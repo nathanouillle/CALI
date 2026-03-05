@@ -107,6 +107,10 @@ def compute_accuracy(data: TensorDict) -> float:
 
 def run_full_extraction_pipeline(seed: int) -> None:
     """Run end-to-end extraction for CIFAR-10 ResNet and save feature files."""
+    ckpt_path = os.path.join(MODELS_DIR, f"cifar10_resnet_seed{seed}.pt")
+    if not os.path.exists(ckpt_path):
+        raise ValueError(f"No trained model found at: {ckpt_path}")
+    
     save_path = os.path.join(RESULTS_DIR, f"features_cifar10_resnet", f"seed{seed}")
     train_features_path = os.path.join(save_path, "train_features.pt")
     eval_features_path = os.path.join(save_path, "eval_features.pt")
@@ -119,11 +123,6 @@ def run_full_extraction_pipeline(seed: int) -> None:
     
     # 2. Model creation.
     model = create_model(num_classes=num_classes).to(DEVICE)
-
-    ckpt_path = os.path.join(MODELS_DIR, f"cifar10_resnet_seed{seed}.pt")
-    if not os.path.exists(ckpt_path):
-        raise ValueError(f"No trained model found at: {ckpt_path}")
-    
     model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
     model.to(DEVICE)
     
