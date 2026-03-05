@@ -77,9 +77,7 @@ class FeatureExtractor:
 
         self.model.eval()
         self._register_hooks()
-        
-        print("Extracting features for architecture: ResNet")
-        
+                
         try:
             with torch.no_grad():
                 for inputs, labels in loader:
@@ -148,5 +146,3 @@ def run_full_extraction_pipeline(seed: int) -> None:
     os.makedirs(save_path, exist_ok=True)
     torch.save(train_data, train_features_path)
     torch.save(eval_data, eval_features_path)
-    
-    print(f"Features saved to: {save_path}")

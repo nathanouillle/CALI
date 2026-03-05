@@ -5,6 +5,7 @@ import pandas as pd
 import os
 
 from .constants import RESULTS_DIR
+from src.evaluation import save_failure_threshold
 
 def plot_publication_separation(df, methods_to_plot=None):
     """
@@ -25,7 +26,7 @@ def plot_publication_separation(df, methods_to_plot=None):
     c_error = colors[1]   # Orange
 
     NAME_MAPPING = {
-        'score_cwae': 'CALI (Ours)',
+        'score_cali': 'CALI (Ours)',
         'score_softmax': 'MSP (Baseline)',
         'score_energy': 'Energy Score',
         'score_confidnet': 'ConfidNet',
@@ -36,7 +37,7 @@ def plot_publication_separation(df, methods_to_plot=None):
 
     # Sélection automatique des 4 meilleures méthodes si non spécifié
     if methods_to_plot is None:
-        methods_to_plot = ['deep_ensemble_scores', 'score_trust', 'score_confidnet', 'score_cwae',]
+        methods_to_plot = ['deep_ensemble_scores', 'score_trust', 'score_confidnet', 'score_cali',]
 
     # --- 2. PRÉPARATION DU CANVAS (1 ligne, 4 colonnes) ---
     fig, axes = plt.subplots(1, 5, figsize=(15, 3), sharex=True, sharey=False)
@@ -94,6 +95,9 @@ def plot_operational_stability_failure(seed: int = 0, delta: float = 0.05) -> No
         KeyError: If required columns are missing in the CSV.
         ValueError: If no rows match `delta` or no plottable data is available.
     """
+    # If you want a special jitter, add the delta value in the call of save_failure_threshold. Example: save_failure_threshold(seed=0, delta=0.28)
+    # deltas for [0.01, 0.02, 0.05, 0.1, 0.15, 0.2] are already computed in the CSV
+    df = save_failure_threshold(seed=seed, delta=delta)
 
     def parse_numpy_string(value: object) -> np.ndarray:
         if isinstance(value, np.ndarray):
@@ -104,22 +108,6 @@ def plot_operational_stability_failure(seed: int = 0, delta: float = 0.05) -> No
             return np.array([], dtype=float)
         cleaned = str(value).replace("[", " ").replace("]", " ").replace("\n", " ")
         return np.fromstring(cleaned, sep=" ")
-
-    path_pattern = f"{RESULTS_DIR}/failure_threshold/cifar10_resnet_seed{seed}_results.csv"
-    if not os.path.exists(path_pattern):
-        raise FileNotFoundError(f"Failure-threshold results file not found: {path_pattern}")
-
-    df = pd.read_csv(path_pattern)
-
-    required_cols = {"Delta", "Method", "Risk Increase", "Test Thresholds", "Tau Star", "ARI"}
-    missing_cols = required_cols.difference(df.columns)
-    if missing_cols:
-        missing = ", ".join(sorted(missing_cols))
-        raise KeyError(f"Missing required columns in results file: {missing}")
-
-    df = df[np.isclose(df["Delta"], delta)]
-    if df.empty:
-        raise ValueError(f"No rows found for delta={delta} in {path_pattern}")
 
     sns.set_context("paper", font_scale=1.4)
     sns.set_style("ticks")

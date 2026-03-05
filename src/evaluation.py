@@ -1,5 +1,5 @@
 import os
-from typing import Any, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
@@ -128,7 +128,6 @@ def get_mc_dropout(seed: int, nb_inference: int = 50) -> Tuple[np.ndarray, np.nd
     cache_path = os.path.join(cache_dir, f"mc_cifar10_resnet_seed{seed}_n{nb_inference}.npz")
 
     if os.path.exists(cache_path):
-        print(f"Loading MC Dropout from cache: {cache_path}")
         data = np.load(cache_path)
         return np.asarray(data["confidence"]), np.asarray(data["correctness"])
 
@@ -148,14 +147,12 @@ def get_mc_dropout(seed: int, nb_inference: int = 50) -> Tuple[np.ndarray, np.nd
     confidence = normalise(confidence)
 
     np.savez_compressed(cache_path, confidence=confidence, correctness=correctness)
-    print(f"MC Dropout computed and saved: {cache_path}")
 
     return confidence, correctness
 
 
 def evaluate_all_methods(seed: int = 0) -> pd.DataFrame:
     """Evaluate all confidence methods and return a unified results DataFrame."""
-    print(f"--- Evaluation Pipeline: cifar10 | resnet | Seed {seed} ---")
 
     feat_path = f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}"
     train_path = f"{feat_path}/train_features.pt"
@@ -334,8 +331,7 @@ def analyze_failure_threshold(
 
 def save_failure_threshold(
     seed: int,
-    deltas: Optional[Sequence[float]] = None,
-    output_dir: str = "./results/failure_threshold",
+    delta: float,
 ) -> pd.DataFrame:
     """Compute and save local threshold-robustness metrics for one seed.
 
@@ -345,49 +341,36 @@ def save_failure_threshold(
 
     Args:
         seed: Random seed used to load model/features and run evaluation.
-        deltas: Sequence of neighborhood ratios passed to
-            `analyze_failure_threshold`. Defaults to
-            `[0.01, 0.02, 0.05, 0.1, 0.15, 0.2]`.
+        delta: Neighborhood ratio passed to `analyze_failure_threshold`.
         output_dir: Directory where the CSV file is written.
 
     Returns:
-        The consolidated DataFrame that is also saved to disk.
+        The threshold analysis DataFrame for the given seed and delta.
     """
-    deltas = deltas or (0.01, 0.02, 0.05, 0.1, 0.15, 0.2)
-
-    os.makedirs(output_dir, exist_ok=True)
-
     df = evaluate_all_methods(seed=seed)
     score_cols = [col for col in df.columns if "score_" in col or "_scores" in col]
 
     seed_results: list[dict[str, Any]] = []
-    for delta in deltas:
-        for score_col in score_cols:
-            analysis = analyze_failure_threshold(
-                df=df,
-                score_col=score_col,
-                delta_ratio=float(delta),
-                n_points=50,
-            )
+    for score_col in score_cols:
+        analysis = analyze_failure_threshold(
+            df=df,
+            score_col=score_col,
+            delta_ratio=float(delta),
+            n_points=50,
+        )
 
-            seed_results.append(
-                {
-                    "Seed": seed,
-                    "Dataset": "cifar10",
-                    "Architecture": "resnet18",
-                    "Method": score_col,
-                    "Delta": float(delta),
-                    "ARI": analysis["ari"],
-                    "Tau Star": analysis["tau_star"],
-                    "Risk Star": analysis["risk_star"],
-                    "Risk Increase": analysis["risk_increase"],
-                    "Test Thresholds": analysis["test_thresholds"],
-                }
-            )
-
-    seed_df = pd.DataFrame(seed_results)
-    file_path = os.path.join(output_dir, f"cifar10_resnet_seed{seed}_results.csv")
-    seed_df.to_csv(file_path, index=False)
-    print(f"Results for seed {seed} saved to {file_path}")
-
-    return seed_df
+        seed_results.append(
+            {
+                "Seed": seed,
+                "Dataset": "cifar10",
+                "Architecture": "resnet18",
+                "Method": score_col,
+                "Delta": float(delta),
+                "ARI": analysis["ari"],
+                "Tau Star": analysis["tau_star"],
+                "Risk Star": analysis["risk_star"],
+                "Risk Increase": analysis["risk_increase"],
+                "Test Thresholds": analysis["test_thresholds"],
+            }
+        )
+    return pd.DataFrame(seed_results)

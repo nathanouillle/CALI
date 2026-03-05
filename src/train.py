@@ -1,4 +1,5 @@
 import os
+import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -40,7 +41,7 @@ def train_resnet(
     epochs = 3
     for epoch in range(epochs):
         total_loss = 0.0
-        for X, y in train_loader:
+        for X, y in tqdm.tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}"):
             X, y = X.to(DEVICE), y.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(X)
@@ -48,14 +49,8 @@ def train_resnet(
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-
         scheduler.step()
-        avg_loss = total_loss / len(train_loader)
-        current_lr = scheduler.get_last_lr()[0]
-        print(f"Seed {seed} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.4f} | LR: {current_lr:.2e}")
-
     torch.save(model.state_dict(), ckpt_path)
-    print(f"Checkpoint saved at {ckpt_path}")
 
 def train_model(seed: int) -> None:
     """Train a model for a given seed and dataset."""

@@ -48,7 +48,6 @@ def load_raw_data_dicts(seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if not (os.path.exists(train_path) and os.path.exists(eval_path)):
         raise FileNotFoundError(f"Feature files not found in: {folder}")
 
-    print(f"Loading raw data from: {folder}")
     eval_dict = torch.load(eval_path)
     train_dict = torch.load(train_path)
 
@@ -67,8 +66,6 @@ def extract_layer_tensors(
         raise KeyError(
             f"Layer '{layer_key}' does not exist in extracted features. Available keys: {list(tuning_dict.keys())}"
         )
-
-    print(f"Extracting tensors for layer: {layer_key}")
 
     # Internal helper to avoid duplicated split-processing logic.
     def process_split(data_dict: Dict[str, Any]) -> Tuple[Union[np.ndarray, torch.Tensor], np.ndarray, np.ndarray, np.ndarray]:
@@ -105,9 +102,6 @@ def run_pipeline_for_layer(
     """
     Run the full CWAE pipeline for a single layer.
     """
-    print(f"\n{'='*60}")
-    print(f"Processing layer: {layer_key}")
-    print(f"{'='*60}")
 
     # 1. Extract split-specific tensors.
     (X_tuning, p_tuning, y_tuning, c_tuning), (X_eval, p_eval, y_eval, c_eval) = \
@@ -145,7 +139,6 @@ def run_pipeline_for_layer(
     print(f"Total training time: {training_time:.2f} seconds")
 
     # 4. Inference.
-    print("Computing latent vectors...")
     z_tuning, z_tuning_recon_loss = manager.infer_latent_space(X_tuning, p_tuning, True)
     z_eval, z_eval_recon_loss = manager.infer_latent_space(X_eval, p_eval, True)
 
@@ -203,8 +196,8 @@ def score_kde(
             kde_time=(end_time-start_time),
         )
 
-    print(f"--- Metrics cifar10_resnet | {layer} ---")
     metrics = compute_metrics(scores=confidence_scores, labels=pipeline.c_eval)
+    print(f"--- CALI metrics cifar10_resnet | {layer} ---")
     print(metrics)
     if save:
         results = {
@@ -248,9 +241,8 @@ def run_cali(
     
     # 2. Limited to penultimate block for this demo.
     layer = ARCHI_LAYERS.get('resnet', [])[-2]
-    print(f"Available layers for ResNet: {layer}")
     try:
-        save_dir = os.path.join(RESULTS_DIR, f"cwae_resnet_cifar10", f"seed{seed}", layer)
+        save_dir = os.path.join(RESULTS_DIR, f"cwae_cifar10_resnet", f"seed{seed}", layer)
         if not os.path.exists(f"{save_dir}/eval_scores.npz"):
             pipeline = run_pipeline_for_layer(
                 seed=seed, layer_key=layer, raw_tuning=raw_tuning, raw_eval=raw_eval, 
@@ -271,10 +263,9 @@ def run_cali(
                 distance_metric=distance_metric,
             )
         else:
-            print("Already computed, loading and evaluating...")
             data = np.load(f"{save_dir}/eval_scores.npz")
             metrics = compute_metrics(scores=data['scores'], labels=data['correctness'])
-            print("--- Metrics Results ---")
+            print("--- CALI metrics cifar10_resnet ---")
             print(metrics)
 
     except Exception as e:

@@ -299,9 +299,9 @@ class MultiClassCWAEManager:
             if (epoch + 1) % 5 == 0:
                 print(f"Ep [{epoch+1}/{epochs}] | learning_rate: {current_learning_rate:.1e} | "
                     f"Loss: {avg_loss:.4f} | "
-                    f'Rec: {epoch_recon/len(loader):.4f} | '
-                    f"CW: {epoch_cw/len(loader):.4f} | "
-                    f"Radius: {epoch_push/len(loader):.4f}")
+                    f'Rec Loss: {epoch_recon/len(loader):.4f} | '
+                    f"CW Loss: {epoch_cw/len(loader):.4f} | "
+                    f"Push Loss: {epoch_push/len(loader):.4f}")
 
             if history['std_z'][-1] < 0.1:
                 print("Warning: collapse detected (very low latent STD).")

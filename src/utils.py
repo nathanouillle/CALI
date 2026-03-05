@@ -41,7 +41,6 @@ def get_loader_cifar10() -> tuple[DataLoader, DataLoader, int]:
 
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     eval_loader = DataLoader(eval_set, batch_size=BATCH_SIZE, shuffle=False)
-    print(f"Number of classes: {num_classes}")
     return train_loader, eval_loader, num_classes
 
 def compute_wasserstein_score(scores: ArrayLike, labels: ArrayLike) -> float:
