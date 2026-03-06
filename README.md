@@ -36,12 +36,10 @@ Do this first. The notebook is intentionally lightweight and expects checkpoints
 
 You have two options:
 
-- **Option A (recommended for quick demo):** download **all** classifier checkpoints from **[[HERE](https://osf.io/k2tgw/overview?view_only=b53979387b844dd195832d3cb9a9bbfa)]** and place them in `models/` with names like:
-	- `cifar10_resnet_seed0.pt`
-	- `cifar10_resnet_seed1.pt`
-	- `cifar10_resnet_seed2.pt`
-	- `cifar10_resnet_seed3.pt`
-	- `cifar10_resnet_seed42.pt`
+- **Option A (recommended for quick demo):** download **all** classifier checkpoints from **[[HERE](https://osf.io/k2tgw/overview?view_only=b53979387b844dd195832d3cb9a9bbfa)]** and unzip them the root of this repository. The expected files are:
+	- `models/cifar10_resnet_seed<seed>.pth`
+	- `results/confidnet_cifar10_resnet_seed<seed>.npz`
+It will allow you to run the full notebook pipeline without waiting for training the models and other baselines.
 - **Option B (train locally):** follow these training steps before running the full notebook pipeline:
 	- Train classifiers for the seeds you use in the Deep Ensemble baseline (for example `[0, 1, 2, 3, 42]`) with `train_model(seed=seed)`.
 	- Train ConfidNet with `train_confidnet(seed=seed)`.
