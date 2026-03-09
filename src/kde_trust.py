@@ -8,6 +8,7 @@ from sklearn.covariance import EmpiricalCovariance
 from typing import Union, List, Dict, Any
 import torch
 
+
 class KDETrust:
     def __init__(
         self,

@@ -3,8 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as tv_models
 
+
 class ResNet(nn.Module):
-    def __init__(self, num_classes: int = 10, input_channels: int = 3, dropout_rate: float = 0.3) -> None:
+    def __init__(
+        self, num_classes: int = 10, input_channels: int = 3, dropout_rate: float = 0.3
+    ) -> None:
         """
         Build a ResNet-18 backbone adapted for small images.
 
@@ -24,7 +27,10 @@ class ResNet(nn.Module):
         self.backbone.conv1 = nn.Conv2d(
             in_channels=input_channels,
             out_channels=64,
-            kernel_size=3, stride=1, padding=1, bias=False
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
         self.backbone.maxpool = nn.Identity()
 
@@ -39,7 +45,7 @@ class ResNet(nn.Module):
             if use_dropout:
                 return F.dropout(tensor, p=self.dropout_rate, training=True)
             return tensor
-        
+
         x = self.backbone.conv1(x)
         x = self.backbone.bn1(x)
         x = self.backbone.relu(x)
@@ -57,9 +63,14 @@ class ResNet(nn.Module):
         x = maybe_dropout(x)
         logits = self.backbone.fc(x)
         return logits
-    
+
+
 def create_model(num_classes: int = 10) -> nn.Module:
     """Create the default ResNet model configuration for CIFAR-like RGB data."""
     input_channels = 3
     dropout_rate = 0.2
-    return ResNet(num_classes=num_classes, input_channels=input_channels, dropout_rate=dropout_rate)
+    return ResNet(
+        num_classes=num_classes,
+        input_channels=input_channels,
+        dropout_rate=dropout_rate,
+    )

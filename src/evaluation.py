@@ -49,7 +49,9 @@ def load_cali_scores(seed: int) -> Optional[np.ndarray]:
     return np.asarray(data["scores"])
 
 
-def get_baseline_scores(eval_features: dict[str, torch.Tensor]) -> Tuple[np.ndarray, np.ndarray]:
+def get_baseline_scores(
+    eval_features: dict[str, torch.Tensor],
+) -> Tuple[np.ndarray, np.ndarray]:
     """Compute MSP softmax confidence and normalized energy-based confidence."""
     logits = eval_features["logits"].cpu()
     probs = F.softmax(logits, dim=1)
@@ -59,7 +61,9 @@ def get_baseline_scores(eval_features: dict[str, torch.Tensor]) -> Tuple[np.ndar
     return normalise(softmax_scores), normalise(-energy_scores)
 
 
-def compute_metrics(scores: ArrayLike, labels: ArrayLike) -> Tuple[float, float, float, float, float, float, float]:
+def compute_metrics(
+    scores: ArrayLike, labels: ArrayLike
+) -> Tuple[float, float, float, float, float, float, float]:
     """Compute confidence-quality metrics from scores and binary correctness labels."""
     scores_arr = np.asarray(scores)
     labels_arr = np.asarray(labels)
@@ -126,7 +130,9 @@ def get_mc_dropout(seed: int, nb_inference: int = 50) -> Tuple[np.ndarray, np.nd
     """Get MC Dropout confidence from cache or by computing fresh predictions."""
     cache_dir = os.path.join(RESULTS_DIR, "mc_dropout_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    cache_path = os.path.join(cache_dir, f"mc_cifar10_resnet_seed{seed}_n{nb_inference}.npz")
+    cache_path = os.path.join(
+        cache_dir, f"mc_cifar10_resnet_seed{seed}_n{nb_inference}.npz"
+    )
 
     if os.path.exists(cache_path):
         data = np.load(cache_path)
@@ -150,6 +156,7 @@ def get_mc_dropout(seed: int, nb_inference: int = 50) -> Tuple[np.ndarray, np.nd
     np.savez_compressed(cache_path, confidence=confidence, correctness=correctness)
 
     return confidence, correctness
+
 
 def compute_deep_ensemble(
     ensemble_seeds: list[int],
@@ -201,24 +208,36 @@ def compute_deep_ensemble(
     ensemble_correctness = (ensemble_preds == labels).astype(int)
 
     epsilon = 1e-12
-    ensemble_entropy = -torch.sum(
-        mean_probs * torch.log(mean_probs + epsilon),
-        dim=1,
-    ).cpu().numpy()
+    ensemble_entropy = (
+        -torch.sum(
+            mean_probs * torch.log(mean_probs + epsilon),
+            dim=1,
+        )
+        .cpu()
+        .numpy()
+    )
     deep_ensemble_scores = normalise(-ensemble_entropy)
 
     return deep_ensemble_scores, ensemble_correctness
 
 
-def evaluate_all_methods(seed: int = 0, deep_ensemble_seeds: list[int]=[0,1,2,3,42]) -> pd.DataFrame:
+def evaluate_all_methods(
+    seed: int = 0, deep_ensemble_seeds: list[int] = [0, 1, 2, 3, 42]
+) -> pd.DataFrame:
     """Evaluate all confidence methods and return a unified results DataFrame."""
 
     feat_path = f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}"
     train_path = f"{feat_path}/train_features.pt"
     eval_path = f"{feat_path}/eval_features.pt"
     confidnet_path = f"{RESULTS_DIR}/confidnet_cifar10_resnet_seed{seed}.npz"
-    if not (os.path.exists(eval_path) or os.path.exists(train_path) or os.path.exists(confidnet_path)):
-        raise FileNotFoundError(f"Missing required files for seed {seed}. Ensure features and ConfidNet scores are computed.")
+    if not (
+        os.path.exists(eval_path)
+        or os.path.exists(train_path)
+        or os.path.exists(confidnet_path)
+    ):
+        raise FileNotFoundError(
+            f"Missing required files for seed {seed}. Ensure features and ConfidNet scores are computed."
+        )
 
     tuning_features = torch.load(train_path)
     eval_features = torch.load(eval_path)
@@ -230,8 +249,12 @@ def evaluate_all_methods(seed: int = 0, deep_ensemble_seeds: list[int]=[0,1,2,3,
     cali_scores = load_cali_scores(seed)
     softmax_scores, energy_scores = get_baseline_scores(eval_features)
     confidnet_scores = normalise(np.load(confidnet_path)["confidences"])
-    mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(seed=seed, nb_inference=50)
-    deep_ensemble_scores, deep_correctness = compute_deep_ensemble(ensemble_seeds=deep_ensemble_seeds)
+    mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(
+        seed=seed, nb_inference=50
+    )
+    deep_ensemble_scores, deep_correctness = compute_deep_ensemble(
+        ensemble_seeds=deep_ensemble_seeds
+    )
 
     layers = ARCHI_LAYERS.get("resnet")
     if layers is None or len(layers) < 2:
@@ -264,11 +287,13 @@ def evaluate_all_methods(seed: int = 0, deep_ensemble_seeds: list[int]=[0,1,2,3,
         "score_trust": trust_scores,
     }
 
-    return pd.DataFrame({
-        key: (value.ravel() if hasattr(value, "ravel") else value)
-        for key, value in data.items()
-        if value is not None
-    })
+    return pd.DataFrame(
+        {
+            key: (value.ravel() if hasattr(value, "ravel") else value)
+            for key, value in data.items()
+            if value is not None
+        }
+    )
 
 
 def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
@@ -276,10 +301,14 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     correctness = (results["gold_label"] == results["predicted_label"]).astype(int)
 
     metrics_cali = compute_metrics(scores=results["score_cali"], labels=correctness)
-    metrics_softmax = compute_metrics(scores=results["score_softmax"], labels=correctness)
+    metrics_softmax = compute_metrics(
+        scores=results["score_softmax"], labels=correctness
+    )
     metrics_trust = compute_metrics(scores=results["score_trust"], labels=correctness)
     metrics_energy = compute_metrics(scores=results["score_energy"], labels=correctness)
-    metrics_confidnet = compute_metrics(scores=results["score_confidnet"], labels=correctness)
+    metrics_confidnet = compute_metrics(
+        scores=results["score_confidnet"], labels=correctness
+    )
     metrics_mc_dropout = compute_metrics(
         scores=results["score_mcdropout"],
         labels=results["mc_dropout_correctness"],
@@ -313,7 +342,9 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def compare_methods(seed: int=0, deep_ensemble_seeds: list[int]=[0,1,2,3,42]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compare_methods(
+    seed: int = 0, deep_ensemble_seeds: list[int] = [0, 1, 2, 3, 42]
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Run the full evaluation pipeline and print the metrics comparison."""
     if len(deep_ensemble_seeds) < 2:
         raise ValueError("At least 2 seeds are required for deep ensemble evaluation.")

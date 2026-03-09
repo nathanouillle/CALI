@@ -6,7 +6,7 @@ RESULTS_DIR = "./results"
 MODELS_DIR = "./models"
 
 ARCHI_LAYERS = {
-    "resnet": ['conv1', 'layer1', 'layer2', 'layer3', 'layer4', 'logits'],
+    "resnet": ["conv1", "layer1", "layer2", "layer3", "layer4", "logits"],
 }
 
 # MODELS

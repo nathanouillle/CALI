@@ -13,6 +13,7 @@ from .constants import DEVICE, MODELS_DIR
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 
+
 def train_resnet(
     model: nn.Module,
     train_loader: DataLoader,
@@ -51,6 +52,7 @@ def train_resnet(
             total_loss += loss.item()
         scheduler.step()
     torch.save(model.state_dict(), ckpt_path)
+
 
 def train_model(seed: int) -> None:
     """Train a model for a given seed and dataset."""

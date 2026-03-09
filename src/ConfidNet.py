@@ -14,10 +14,12 @@ from .constants import ARCHI_LAYERS, DEVICE, MODELS_DIR, RESULTS_DIR
 # CODE AND TRAINING BASED HYPERPARAMETERS FOR CIFAR10 BASED ON THE OFFICIAL CONFIDNET IMPLEMENTATION AVAILABLE AT: https://github.com/valeoai/ConfidNet/tree/master?tab=readme-ov-file
 # Under the Apache License, Version 2.0, Copyright 2019 Valeo
 
+
 def get_confid_net_model(input_dim: int) -> nn.Module:
     """
     Build the ConfidNet head used to predict confidence from penultimate features.
     """
+
     class ConfidNet(nn.Module):
         def __init__(self, input_dim: int):
             super().__init__()
@@ -39,13 +41,19 @@ def get_confid_net_model(input_dim: int) -> nn.Module:
     return model
 
 
-def get_confidnet_loader(feature_path: str, layer_key: str, train: bool) -> Tuple[DataLoader, int]:
+def get_confidnet_loader(
+    feature_path: str, layer_key: str, train: bool
+) -> Tuple[DataLoader, int]:
     if not os.path.exists(feature_path):
-        run_full_extraction_pipeline(seed=int(feature_path.split("seed")[-1].split("/")[0]))
+        run_full_extraction_pipeline(
+            seed=int(feature_path.split("seed")[-1].split("/")[0])
+        )
     data = torch.load(feature_path)
 
     if layer_key not in data:
-        raise KeyError(f"Layer '{layer_key}' not found in file. Available keys: {list(data.keys())}")
+        raise KeyError(
+            f"Layer '{layer_key}' not found in file. Available keys: {list(data.keys())}"
+        )
 
     features = data[layer_key]
     if features.dim() > 2:
@@ -65,7 +73,13 @@ def get_confidnet_loader(feature_path: str, layer_key: str, train: bool) -> Tupl
     return DataLoader(dataset, batch_size=128, shuffle=train), features.shape[1]
 
 
-def train_confidnet(seed: int, epochs: int=250, lr: float=0.01, momentum: float=0.9, weight_decay: float=0.0005) -> None:
+def train_confidnet(
+    seed: int,
+    epochs: int = 250,
+    lr: float = 0.01,
+    momentum: float = 0.9,
+    weight_decay: float = 0.0005,
+) -> None:
     """
     Train ConfidNet on extracted features using TCP as regression target.
     """
@@ -76,11 +90,11 @@ def train_confidnet(seed: int, epochs: int=250, lr: float=0.01, momentum: float=
         return
     set_seed(seed)
 
-    layers = ARCHI_LAYERS.get('resnet')
+    layers = ARCHI_LAYERS.get("resnet")
     tuning_loader_confid, input_dim = get_confidnet_loader(
-        feature_path=f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}/train_features.pt", 
-        layer_key=layers[-2], 
-        train=True
+        feature_path=f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}/train_features.pt",
+        layer_key=layers[-2],
+        train=True,
     )
 
     confidnet = get_confid_net_model(input_dim)
@@ -103,7 +117,9 @@ def train_confidnet(seed: int, epochs: int=250, lr: float=0.01, momentum: float=
             total_loss += loss.item()
 
         if (epoch + 1) % 10 == 0:
-            print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss / len(tuning_loader_confid):.6f}")
+            print(
+                f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss / len(tuning_loader_confid):.6f}"
+            )
 
     end_time = time.time()
     training_time = end_time - start_time
@@ -130,7 +146,7 @@ def evaluate_confidnet(seed: int) -> None:
     if not os.path.exists(ckpt_path):
         raise ValueError(f"No trained model found at: {ckpt_path}")
 
-    layers = ARCHI_LAYERS.get('resnet')
+    layers = ARCHI_LAYERS.get("resnet")
 
     test_loader_confid, input_dim = get_confidnet_loader(
         feature_path=f"{RESULTS_DIR}/features_cifar10_resnet/seed{seed}/eval_features.pt",
