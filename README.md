@@ -78,6 +78,16 @@ For the Deep Ensemble method, standard deviation is not applicable as 5 runs are
 <img width="1307" height="287" alt="image" src="https://github.com/user-attachments/assets/3dfce72e-aeef-4673-8141-22b3f6fb9892" />
 
 
+### Datasets Detailed Statistics
+Details the per-class sample distribution for each dataset. It reports the average and minimum number of correct and incorrect predictions available to fit the failure prediction methods, conditioned on the classifier's performance.
+
+<img width="1334" height="372" alt="image" src="https://github.com/user-attachments/assets/c590b220-0534-416b-a535-570cb074d1fe" />
+
+### Time Complexity Example
+Performed on a NVIDIA  Tesla  V100  GPU
+
+<img width="708" height="349" alt="image" src="https://github.com/user-attachments/assets/56fde60d-603d-4811-9b34-f99ccc990328" />
+
 
 
 
