@@ -1,6 +1,6 @@
 # CALI
 
-Anonymous demo repository for ECML PKDD 2026.
+Anonymous demo repository for ICDM 2026.
 
 CALI is a failure-prediction method for DNN classifiers. The pipeline combines:
 - A tailored Cramer-Wold Auto-Encoder (CWAE) with the introduced push loss for latent space structuring,
@@ -60,3 +60,26 @@ It will:
 - Main usage is notebook-first (`CALI.ipynb`).
 - Code for Trust Score borrowed from : [HERE](https://github.com/google/TrustScore) ([LICENSE](https://github.com/google/TrustScore/blob/master/LICENSE))
 - Code for ConfidNet borrowed from : [HERE](https://github.com/valeoai/ConfidNet) ([LICENSE](https://github.com/valeoai/ConfidNet/tree/master/LICENSE))
+
+## Detailed Results on Datasets
+
+The following tables present detailed performance metrics for several architecture-dataset pairs, reporting mean and standard deviation across 5 independent runs with different seeds.
+
+For the Deep Ensemble method, standard deviation is not applicable as 5 runs are combined into one result.
+
+**Bold values** indicate the best-performing method per metric (within a tolerance of $\pm 0.001$ to account for numerical precision). 
+<img width="1313" height="295" alt="image" src="https://github.com/user-attachments/assets/1d89f755-4918-4a6d-86d3-d43509b2f6ab" />
+<img width="1307" height="293" alt="image" src="https://github.com/user-attachments/assets/ef87de24-aa16-4428-b1e8-5687df09cc97" />
+<img width="1311" height="295" alt="image" src="https://github.com/user-attachments/assets/9b3ffdcb-93e7-4ab5-aee7-e9a6b8e100b5" />
+<img width="1310" height="295" alt="image" src="https://github.com/user-attachments/assets/39f8c3f6-6bcd-4501-92ab-81d14e8148d0" />
+<img width="1316" height="285" alt="image" src="https://github.com/user-attachments/assets/863854cd-72e2-471b-b626-e052306ff943" />
+<img width="1308" height="279" alt="image" src="https://github.com/user-attachments/assets/4f04e2aa-22c6-4650-a500-1ac2de37e77c" />
+<img width="1309" height="294" alt="image" src="https://github.com/user-attachments/assets/6f347bd2-d043-4c3a-b60d-a3d4416919d8" />
+<img width="1307" height="287" alt="image" src="https://github.com/user-attachments/assets/3dfce72e-aeef-4673-8141-22b3f6fb9892" />
+
+
+
+
+
+
+
