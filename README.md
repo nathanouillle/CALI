@@ -88,6 +88,11 @@ Performed on a NVIDIA  Tesla  V100  GPU
 
 <img width="708" height="349" alt="image" src="https://github.com/user-attachments/assets/56fde60d-603d-4811-9b34-f99ccc990328" />
 
+## Push Loss for Failure Prediction
+
+In this work, we introduce a novel dimensionality reduction method, a CWAE regularized by a custom Push Loss, to exploit high-dimensional DNN embeddings for failure prediction. The following table demonstrates its impact:
+
+<img width="1482" height="763" alt="image" src="https://github.com/user-attachments/assets/5dd44224-0bc3-4323-aff7-1f2237c43da2" />
 
 
 
