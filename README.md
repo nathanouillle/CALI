@@ -68,33 +68,28 @@ The following tables present detailed performance metrics for several architectu
 For the Deep Ensemble method, standard deviation is not applicable as 5 runs are combined into one result.
 
 **Bold values** indicate the best-performing method per metric (within a tolerance of $\pm 0.001$ to account for numerical precision). 
-<img width="1313" height="295" alt="image" src="https://github.com/user-attachments/assets/1d89f755-4918-4a6d-86d3-d43509b2f6ab" />
-<img width="1307" height="293" alt="image" src="https://github.com/user-attachments/assets/ef87de24-aa16-4428-b1e8-5687df09cc97" />
-<img width="1311" height="295" alt="image" src="https://github.com/user-attachments/assets/9b3ffdcb-93e7-4ab5-aee7-e9a6b8e100b5" />
-<img width="1310" height="295" alt="image" src="https://github.com/user-attachments/assets/39f8c3f6-6bcd-4501-92ab-81d14e8148d0" />
-<img width="1316" height="285" alt="image" src="https://github.com/user-attachments/assets/863854cd-72e2-471b-b626-e052306ff943" />
-<img width="1308" height="279" alt="image" src="https://github.com/user-attachments/assets/4f04e2aa-22c6-4650-a500-1ac2de37e77c" />
-<img width="1309" height="294" alt="image" src="https://github.com/user-attachments/assets/6f347bd2-d043-4c3a-b60d-a3d4416919d8" />
-<img width="1307" height="287" alt="image" src="https://github.com/user-attachments/assets/3dfce72e-aeef-4673-8141-22b3f6fb9892" />
+<img width="1313" height="295" alt="image" src="figures/CIFAR10 - ResNet-18.png" />
+<img width="1307" height="293" alt="image" src="figures/CIFAR10 - VGG-16.png" />
+<img width="1311" height="295" alt="image" src="figures/CIFAR100 - ResNet-50.png" />
+<img width="1310" height="295" alt="image" src="figures/FashionMNIST - CNN.png" />
+<img width="1316" height="285" alt="image" src="figures/MNIST - CNN.png" />
+<img width="1308" height="279" alt="image" src="figures/PneumoniaMNIST - ResNet-18.png" />
+<img width="1309" height="294" alt="image" src="figures/SVHN - DenseNet-121.png" />
+<img width="1307" height="287" alt="image" src="figures/SVHN - WideResNet-50.png" />
 
 
 ### Datasets Detailed Statistics
 Details the per-class sample distribution for each dataset. It reports the average and minimum number of correct and incorrect predictions available to fit the failure prediction methods, conditioned on the classifier's performance.
 
-<img width="1334" height="372" alt="image" src="https://github.com/user-attachments/assets/c590b220-0534-416b-a535-570cb074d1fe" />
+<img width="1334" height="372" alt="image" src="figures/Dataset Statistics.png" />
 
 ### Time Complexity Example
 Performed on a NVIDIA  Tesla  V100  GPU
 
-<img width="708" height="349" alt="image" src="https://github.com/user-attachments/assets/56fde60d-603d-4811-9b34-f99ccc990328" />
+<img width="708" height="349" alt="image" src="figures/Time Complexity.png" />
 
 ## Push Loss for Failure Prediction
 
 In this work, we introduce a novel dimensionality reduction method, a CWAE regularized by a custom Push Loss, to exploit high-dimensional DNN embeddings for failure prediction. The following table demonstrates its impact:
 
-<img width="1482" height="763" alt="image" src="https://github.com/user-attachments/assets/5dd44224-0bc3-4323-aff7-1f2237c43da2" />
-
-
-
-
-
+<img width="1482" height="763" alt="image" src="figures/Dimensionality Reduction Ablation.png" />
