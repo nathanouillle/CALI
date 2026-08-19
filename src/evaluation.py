@@ -60,6 +60,29 @@ def get_baseline_scores(
     energy_scores = -np.asarray(logsumexp(logits.numpy(), axis=1), dtype=np.float64)
     return normalise(softmax_scores), normalise(-energy_scores)
 
+def get_relu_scores(tuning_features, test_features, lambda_param=0.5):
+
+    """
+    Compute REL-U scores from Algorithme 1 from Dadalto et al.
+    """
+    preds = to_numpy(tuning_features['predictions'])
+    probs = F.softmax(tuning_features['logits'], dim=1)
+    
+    probs_pos = probs[preds == tuning_features['labels'].squeeze()].squeeze() # D_m^+
+    probs_neg = probs[preds != tuning_features['labels'].squeeze()].squeeze() # D_m^-
+    
+    mu_pos = np.mean(np.einsum('ni,nj->nij', probs_pos, probs_pos), axis=0)
+    mu_neg = np.mean(np.einsum('ni,nj->nij', probs_neg, probs_neg), axis=0)
+    
+    D_star = np.maximum(lambda_param * mu_neg - (1 - lambda_param) * mu_pos, 0)
+    
+    # 4. Mettre la diagonale à 0 (contrainte d_ii = 0)
+    np.fill_diagonal(D_star, 0)
+    
+    probs_test = F.softmax(test_features['logits'], dim=1).squeeze()
+    scores = torch.sum((probs_test @ D_star) * probs_test, axis=1)
+    scores_normalised = 1-normalise(scores)
+    return scores_normalised
 
 def compute_metrics(
     scores: ArrayLike, labels: ArrayLike
@@ -248,6 +271,7 @@ def evaluate_all_methods(
 
     cali_scores = load_cali_scores(seed)
     softmax_scores, energy_scores = get_baseline_scores(eval_features)
+    relu_scores = get_relu_scores(tuning_features, eval_features)
     confidnet_scores = normalise(np.load(confidnet_path)["confidences"])
     mc_dropout_scores, correctness_mc_dropout = get_mc_dropout(
         seed=seed, nb_inference=50
@@ -285,6 +309,7 @@ def evaluate_all_methods(
         "deep_ensemble_scores": deep_ensemble_scores,
         "deep_correctness": deep_correctness,
         "score_trust": trust_scores,
+        "score_relu": relu_scores,
     }
 
     return pd.DataFrame(
@@ -304,6 +329,7 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
     metrics_softmax = compute_metrics(
         scores=results["score_softmax"], labels=correctness
     )
+    metrics_relu = compute_metrics(scores=results["score_relu"], labels=correctness)
     metrics_trust = compute_metrics(scores=results["score_trust"], labels=correctness)
     metrics_energy = compute_metrics(scores=results["score_energy"], labels=correctness)
     metrics_confidnet = compute_metrics(
@@ -337,6 +363,7 @@ def compute_all_metrics(results: pd.DataFrame) -> pd.DataFrame:
             "MC_Dropout": metrics_mc_dropout,
             "Deep_Ensemble": metrics_deep_ensemble,
             "ConfidNet": metrics_confidnet,
+            "REL-U": metrics_relu,
         },
         index=row_titles,
     )

@@ -1,6 +1,6 @@
 # CALI
 
-Anonymous demo repository for ICDM 2026.
+Anonymous demo repository for TML4DM-ICDM 2026.
 
 CALI is a failure-prediction method for DNN classifiers. The pipeline combines:
 - A tailored Cramer-Wold Auto-Encoder (CWAE) with the introduced push loss for latent space structuring,
@@ -68,14 +68,14 @@ The following tables present detailed performance metrics for several architectu
 For the Deep Ensemble method, standard deviation is not applicable as 5 runs are combined into one result.
 
 **Bold values** indicate the best-performing method per metric (within a tolerance of $\pm 0.001$ to account for numerical precision). 
-<img width="1313" height="295" alt="image" src="figures/CIFAR10 - ResNet-18.png" />
-<img width="1307" height="293" alt="image" src="figures/CIFAR10 - VGG-16.png" />
-<img width="1311" height="295" alt="image" src="figures/CIFAR100 - ResNet-50.png" />
-<img width="1310" height="295" alt="image" src="figures/FashionMNIST - CNN.png" />
-<img width="1316" height="285" alt="image" src="figures/MNIST - CNN.png" />
-<img width="1308" height="279" alt="image" src="figures/PneumoniaMNIST - ResNet-18.png" />
-<img width="1309" height="294" alt="image" src="figures/SVHN - DenseNet-121.png" />
-<img width="1307" height="287" alt="image" src="figures/SVHN - WideResNet-50.png" />
+<img width="1313" height="295" alt="image" src="figures/CIFAR10 -- ResNet-18.png" />
+<img width="1307" height="293" alt="image" src="figures/CIFAR10 -- VGG-16.png" />
+<img width="1311" height="295" alt="image" src="figures/CIFAR100 -- ResNet-50.png" />
+<img width="1310" height="295" alt="image" src="figures/FashionMNIST -- CNN.png" />
+<img width="1316" height="285" alt="image" src="figures/MNIST -- CNN.png" />
+<img width="1308" height="279" alt="image" src="figures/PneumoniaMNIST -- ResNet-18.png" />
+<img width="1309" height="294" alt="image" src="figures/SVHN -- DenseNet-121.png" />
+<img width="1307" height="287" alt="image" src="figures/SVHN -- WideResNet-50.png" />
 
 
 ### Datasets Detailed Statistics

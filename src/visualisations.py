@@ -28,6 +28,7 @@ def plot_distribution_separation(df):
         "deep_ensemble_scores": "Deep Ensemble",
         "score_trust": "Trust Score",
         "score_mcdropout": "MC Dropout",
+        "score_relu": "REL-U",
     }
 
     # --- 2. PRÉPARATION DU CANVAS ---
@@ -81,7 +82,7 @@ def plot_distribution_separation(df):
             if ax.get_legend():
                 ax.get_legend().remove()
 
-    fig.delaxes(axes[1, 3])
+    #fig.delaxes(axes[1, 3])
 
     plt.tight_layout()
     sns.despine(offset=10, trim=True)
@@ -134,6 +135,7 @@ def plot_risk_increase(
         "score_trust": "#335F8A",
         "score_confidnet": "#55D5E0",
         "score_softmax": "#95a5a6",
+        "score_relu": "#9B59B6",
     }
 
     name_mapping = {
@@ -144,6 +146,7 @@ def plot_risk_increase(
         "deep_ensemble_scores": "Deep Ensemble",
         "score_trust": "Trust Score",
         "score_mcdropout": "MC Dropout",
+        "score_relu": "REL-U",
     }
 
     methods_to_plot = df["Method"].dropna().unique()
